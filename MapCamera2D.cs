@@ -3,7 +3,7 @@
 /*
  * A simple script which allow the camera to move over a 2D map
  * It handle both mouse and touch input
- * TODO : calculate camera frustum and enforce boudary based on frustrum instead of camera position
+ * TODO : calculate camera frustum and enforce boundary based on frustrum instead of camera position
  */ 
 public class MapCamera2D : MonoBehaviour
 {
@@ -24,8 +24,8 @@ public class MapCamera2D : MonoBehaviour
     {
         mCamera = Camera.main;
         this.defaultZ = transform.position.z;  // Distance camera is above map
-        this.currentPos = new Vector3(transform.position.x, transform.position.y, this.defaultZ);
-        this.wantedPos = new Vector3(this.currentPos.x, this.currentPos.y, this.defaultZ); // Copy the vector
+        this.currentPos = transform.position;
+        this.wantedPos = this.currentPos;
         this.currentZoom = Camera.main.orthographicSize;
         this.wantedZoom = this.currentZoom;
     }
@@ -48,7 +48,6 @@ public class MapCamera2D : MonoBehaviour
      */
     public void zoomTo(float target)
     {
-        Debug.Log("In ZoomTo");
         target = Mathf.Clamp(target, zoomLimit[0], zoomLimit[1]);
         this.wantedZoom = target;
     }
@@ -59,12 +58,9 @@ public class MapCamera2D : MonoBehaviour
      */
     private void applyZoom(float diff)
     {
-        Debug.Log("In applyZoom");
         Camera.main.orthographicSize = Mathf.Clamp(Camera.main.orthographicSize - diff, zoomLimit[0], zoomLimit[1]);
         this.currentZoom = Camera.main.orthographicSize;
         this.wantedZoom = this.currentZoom;
-        Debug.Log(this.wantedPos);
-        Debug.Log(this.currentPos);
     }
 
     /*
@@ -76,6 +72,7 @@ public class MapCamera2D : MonoBehaviour
         newPos.x = Mathf.Clamp(newPos.x, xlimit[0], xlimit[1]);
         newPos.y = Mathf.Clamp(newPos.y, ylimit[0], ylimit[1]);
         transform.position = newPos;
+        // Below line are used to cancel any automatic move on use input
         this.currentPos = newPos;
         this.wantedPos = newPos;
     }
@@ -85,7 +82,6 @@ public class MapCamera2D : MonoBehaviour
      */
     private void moveCameraToTarget()
     {
-        Debug.Log("In moveCameraToTarget");
         transform.position = Vector3.Lerp(transform.position, this.wantedPos, (Time.deltaTime * damping));
         this.currentPos = transform.position;
     }
@@ -102,11 +98,12 @@ public class MapCamera2D : MonoBehaviour
     void Update()
     {
         // Handle Mouse movement
-        if (Input.GetMouseButtonDown(0))
+        // Because Unity consider touch as mouse bouton, we must add a touchCount here
+        if (Input.GetMouseButtonDown(0) && Input.touchCount == 0)
         {
             startPos = Input.mousePosition;
         }
-        else if (Input.GetMouseButton(0))
+        else if (Input.GetMouseButton(0) && Input.touchCount == 0)
         {
             movePos = Input.mousePosition - startPos;
             float magnitude = (movePos).magnitude;
@@ -114,7 +111,7 @@ public class MapCamera2D : MonoBehaviour
             {
                 // To avoid acceleration as the button is pressed, we need to normalize movePos
                 movePos.Normalize();
-                movePos = movePos * Time.deltaTime * moveSpeed;
+                movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 300.0f);
                 Vector3 tmp = new Vector3(transform.position.x - movePos.x, transform.position.y - movePos.y, defaultZ);
                 applyTransform(tmp);
             }
@@ -132,7 +129,7 @@ public class MapCamera2D : MonoBehaviour
             if (magnitude > 0.1f)
             {
                 movePos.Normalize();
-                movePos = movePos * Time.deltaTime * moveSpeed;
+                movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 300.0f);
                 Vector3 tmp = new Vector3(transform.position.x - movePos.x, transform.position.y - movePos.y, defaultZ);
                 this.applyTransform(tmp);
             }
