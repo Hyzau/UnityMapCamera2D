@@ -10,34 +10,84 @@ public class MapCamera2D : MonoBehaviour
     private float defaultZ;
     private Vector3 startPos, movePos, currentPos, wantedPos;
     private float currentZoom, wantedZoom;
+    private float aspectRatio;
     private Camera mCamera;
+    public bool ignoreClick = false;
     public float damping = 5.0f;
     public float zoomSpeed = 1.0f;
     public float moveSpeed = 3.0f;
     // The first element is the min, the second is the max
-    public float[] xlimit = new float[2] { 0, 100 };
-    public float[] ylimit = new float[2] { 0, 100 };
-    public float[] zoomLimit = new float[2] { 1, 15 };
+    private Vector2 xLimitZoomed;
+    private Vector2 yLimitZoomed;
+    public Vector2 xlimit = new Vector2(0, 100);
+    public Vector2 ylimit = new Vector2(0, 100);
+    
+    public Vector2 zoomLimit = new Vector2(1, 15);
+    
 
 
     void Awake()
     {
         mCamera = Camera.main;
-        this.defaultZ = transform.position.z;  // Distance camera is above map
-        this.currentPos = transform.position;
+        this.defaultZ = mCamera.transform.position.z;  // Distance camera is above map
+        this.currentPos = mCamera.transform.position;
         this.wantedPos = this.currentPos;
-        this.currentZoom = Camera.main.orthographicSize;
+        this.currentZoom = mCamera.orthographicSize;
+        this.aspectRatio = mCamera.aspect;
         this.wantedZoom = this.currentZoom;
+        this.xLimitZoomed = new Vector2();
+        this.yLimitZoomed = new Vector2();
+        this.calculateZoomedLimit();
+    }
+
+    public void calculateZoomedLimit()
+    {
+        float currentDiffX = this.aspectRatio * this.currentZoom;
+        this.xLimitZoomed.x = this.xlimit.x + currentDiffX;
+        this.xLimitZoomed.y = this.xlimit.y - currentDiffX;
+        float currentDiffY = this.currentZoom;
+
+        this.yLimitZoomed.x = this.ylimit.x + currentDiffY;
+        this.yLimitZoomed.y = this.ylimit.y - currentDiffY;
+    }
+
+    public void setPosition(Vector3 pos)
+    {
+        pos.z = this.defaultZ;
+        this.currentPos = pos;
+        this.wantedPos = pos;
+        mCamera.transform.position = pos;
+
+    }
+
+    public Vector3 getPosition()
+    {
+        return this.currentPos;
+    }
+
+    public void setZoom(float zoom)
+    {
+        this.currentZoom = zoom;
+        this.wantedZoom = zoom;
+        mCamera.orthographicSize = zoom;
+        this.calculateZoomedLimit();
+        this.applyTransform(this.currentPos);// in case we zoom in a corner, we need to move the camera within the new boundaries
+    }
+
+    public float getZoom()
+    {
+        return this.currentZoom;
     }
 
     /*
      * A public function to move the camera with another script.
      * Any move input cancel the movement
-     */ 
+     */
     public void moveTo(Vector3 target)
     {
-        target.x = Mathf.Clamp(target.x, xlimit[0], xlimit[1]);
-        target.y = Mathf.Clamp(target.y, ylimit[0], ylimit[1]);
+
+        target.x = Mathf.Clamp(target.x , xLimitZoomed.x, xLimitZoomed.y);
+        target.y = Mathf.Clamp(target.y, yLimitZoomed.x, yLimitZoomed.y);
         target.z = this.defaultZ; // avoid Z movement
         this.wantedPos = target;
     }
@@ -48,7 +98,7 @@ public class MapCamera2D : MonoBehaviour
      */
     public void zoomTo(float target)
     {
-        target = Mathf.Clamp(target, zoomLimit[0], zoomLimit[1]);
+        target = Mathf.Clamp(target, zoomLimit.x, zoomLimit.y);
         this.wantedZoom = target;
     }
 
@@ -58,9 +108,11 @@ public class MapCamera2D : MonoBehaviour
      */
     private void applyZoom(float diff)
     {
-        Camera.main.orthographicSize = Mathf.Clamp(Camera.main.orthographicSize - diff, zoomLimit[0], zoomLimit[1]);
-        this.currentZoom = Camera.main.orthographicSize;
+        mCamera.orthographicSize = Mathf.Clamp(mCamera.orthographicSize - diff, zoomLimit.x, zoomLimit.y);
+        this.currentZoom = mCamera.orthographicSize;
         this.wantedZoom = this.currentZoom;
+        this.calculateZoomedLimit();
+        this.applyTransform(this.currentPos);// in case we zoom in a corner, we need to move the camera within the new boundaries
     }
 
     /*
@@ -69,9 +121,9 @@ public class MapCamera2D : MonoBehaviour
      */
     private void applyTransform(Vector3 newPos)
     {
-        newPos.x = Mathf.Clamp(newPos.x, xlimit[0], xlimit[1]);
-        newPos.y = Mathf.Clamp(newPos.y, ylimit[0], ylimit[1]);
-        transform.position = newPos;
+        newPos.x = Mathf.Clamp(newPos.x, xLimitZoomed.x, xLimitZoomed.y);
+        newPos.y = Mathf.Clamp(newPos.y, yLimitZoomed.x, yLimitZoomed.y);
+        mCamera.transform.position = newPos;
         // Below line are used to cancel any automatic move on use input
         this.currentPos = newPos;
         this.wantedPos = newPos;
@@ -82,8 +134,8 @@ public class MapCamera2D : MonoBehaviour
      */
     private void moveCameraToTarget()
     {
-        transform.position = Vector3.Lerp(transform.position, this.wantedPos, (Time.deltaTime * damping));
-        this.currentPos = transform.position;
+        mCamera.transform.position = Vector3.Lerp(mCamera.transform.position, this.wantedPos, (Time.deltaTime * damping));
+        this.currentPos = mCamera.transform.position;
     }
 
     /*
@@ -91,12 +143,23 @@ public class MapCamera2D : MonoBehaviour
      */
     private void zoomCameraToTarget()
     {
-        Camera.main.orthographicSize = Mathf.Lerp(this.currentZoom, this.wantedZoom, (Time.deltaTime * damping));
-        this.currentZoom = Camera.main.orthographicSize;
+        mCamera.orthographicSize = Mathf.Lerp(this.currentZoom, this.wantedZoom, (Time.deltaTime * damping));
+        this.currentZoom = mCamera.orthographicSize;
     }
 
     void Update()
     {
+        // If another script want to move th camera
+        if (Vector3.Distance(this.wantedPos, this.currentPos) > 0.1f)
+        {
+            this.moveCameraToTarget();
+        }
+        if (Mathf.Abs(this.wantedZoom - this.currentZoom) > 0.1f)
+        {
+            this.zoomCameraToTarget();
+        }
+        if (this.ignoreClick == true)
+            return;
         // Handle Mouse movement
         // Because Unity consider touch as mouse bouton, we must add a touchCount here
         if (Input.GetMouseButtonDown(0) && Input.touchCount == 0)
@@ -112,7 +175,7 @@ public class MapCamera2D : MonoBehaviour
                 // To avoid acceleration as the button is pressed, we need to normalize movePos
                 movePos.Normalize();
                 movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 300.0f);
-                Vector3 tmp = new Vector3(transform.position.x - movePos.x, transform.position.y - movePos.y, defaultZ);
+                Vector3 tmp = new Vector3(mCamera.transform.position.x - movePos.x, mCamera.transform.position.y - movePos.y, defaultZ);
                 applyTransform(tmp);
             }
             
@@ -130,7 +193,7 @@ public class MapCamera2D : MonoBehaviour
             {
                 movePos.Normalize();
                 movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 300.0f);
-                Vector3 tmp = new Vector3(transform.position.x - movePos.x, transform.position.y - movePos.y, defaultZ);
+                Vector3 tmp = new Vector3(mCamera.transform.position.x - movePos.x, mCamera.transform.position.y - movePos.y, defaultZ);
                 this.applyTransform(tmp);
             }
         }
@@ -145,22 +208,14 @@ public class MapCamera2D : MonoBehaviour
             float currentMagnitude = (tZero.position - tOne.position).magnitude;
 
             float diff = currentMagnitude - initialMagnitude;
-            this.applyZoom(diff * 0.01f * zoomSpeed);
+            this.applyZoom(diff * 0.005f * zoomSpeed);
         }
         // Handle mouse wheel zoom
         float mWheel = Input.GetAxis("Mouse ScrollWheel");
         if (mWheel != 0)
         {
-            this.applyZoom(mWheel * zoomSpeed);
+            this.applyZoom(mWheel * 4 * zoomSpeed);
         }
-        // If another script want to move th camera
-        if (Vector3.Distance(this.wantedPos, this.currentPos) > 0.1f)
-        {
-            this.moveCameraToTarget();
-        }
-        if (Mathf.Abs(this.wantedZoom - this.currentZoom) > 0.1f)
-        {
-            this.zoomCameraToTarget();
-        }
+        
     }
 }
