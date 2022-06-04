@@ -51,13 +51,19 @@ public class MapCamera2D : MonoBehaviour
         this.yLimitZoomed.y = this.ylimit.y - currentDiffY;
     }
 
+	// this function overrides any boundaries and should be used for debugging
     public void setPosition(Vector3 pos)
     {
         pos.z = this.defaultZ;
         this.currentPos = pos;
         this.wantedPos = pos;
         mCamera.transform.position = pos;
-
+    }
+	
+	
+	public void setPositionWithinBounds(Vector3 pos)
+    {
+        this.applyTransform(pos);
     }
 
     public Vector3 getPosition()
@@ -85,11 +91,18 @@ public class MapCamera2D : MonoBehaviour
      */
     public void moveTo(Vector3 target)
     {
-
         target.x = Mathf.Clamp(target.x , xLimitZoomed.x, xLimitZoomed.y);
         target.y = Mathf.Clamp(target.y, yLimitZoomed.x, yLimitZoomed.y);
         target.z = this.defaultZ; // avoid Z movement
         this.wantedPos = target;
+    }
+	
+	public void moveTo(Vector2 target)
+    {
+        target.x = Mathf.Clamp(target.x , xLimitZoomed.x, xLimitZoomed.y);
+        target.y = Mathf.Clamp(target.y, yLimitZoomed.x, yLimitZoomed.y);
+        this.wantedPos = target;
+		this.wantedPos.z = this.defaultZ; // avoid Z movement
     }
 
     /*
@@ -121,8 +134,11 @@ public class MapCamera2D : MonoBehaviour
      */
     private void applyTransform(Vector3 newPos)
     {
+        Debug.Log("In apply transform");
+        Debug.Log(newPos);
         newPos.x = Mathf.Clamp(newPos.x, xLimitZoomed.x, xLimitZoomed.y);
         newPos.y = Mathf.Clamp(newPos.y, yLimitZoomed.x, yLimitZoomed.y);
+		newPos.z = this.defaultZ;
         mCamera.transform.position = newPos;
         // Below line are used to cancel any automatic move on use input
         this.currentPos = newPos;
@@ -172,9 +188,14 @@ public class MapCamera2D : MonoBehaviour
             float magnitude = (movePos).magnitude;
             if (magnitude > 0.1f)
             {
+                Debug.Log("MouseDown Moved");
+                Debug.Log(magnitude / 300.0f);
                 // To avoid acceleration as the button is pressed, we need to normalize movePos
+                Debug.Log(movePos);
                 movePos.Normalize();
                 movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 300.0f);
+                Debug.Log(movePos.x);
+                Debug.Log(movePos.y);
                 Vector3 tmp = new Vector3(mCamera.transform.position.x - movePos.x, mCamera.transform.position.y - movePos.y, defaultZ);
                 applyTransform(tmp);
             }
@@ -184,15 +205,24 @@ public class MapCamera2D : MonoBehaviour
         if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began)
         {
             startPos = Input.GetTouch(0).position;
+            Debug.Log("TouchPhase Began");
+            Debug.Log(startPos);
         }
-        else if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Moved)
+        else if (Input.touchCount == 1)
         {
             movePos = new Vector3(Input.GetTouch(0).position.x - startPos.x, Input.GetTouch(0).position.y - startPos.y, startPos.z);
             float magnitude = (movePos).magnitude;
             if (magnitude > 0.1f)
             {
+                Debug.Log("TouchPhase Moved");
+                Debug.Log(magnitude / 200.0f);
                 movePos.Normalize();
-                movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 300.0f);
+                Debug.Log(movePos);
+                movePos = movePos * Time.deltaTime * moveSpeed * (magnitude / 200.0f);
+                Debug.Log(movePos.x);
+                Debug.Log(movePos.y);
+                if (movePos.x == 0 && movePos.y == 0)
+                    Debug.LogWarning("MovePos IS ZERO ! The camera will not move");
                 Vector3 tmp = new Vector3(mCamera.transform.position.x - movePos.x, mCamera.transform.position.y - movePos.y, defaultZ);
                 this.applyTransform(tmp);
             }
